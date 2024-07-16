@@ -1,0 +1,10 @@
+.git/
+.vs/
+BRUTAL/
+x64/
+.gitattributes
+BRUTAL.vcxproj
+BRUTAL.vcxproj.filters
+BRUTAL.vcxproj.user
+README.md
+SDL2.dll
