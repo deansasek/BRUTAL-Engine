@@ -8,3 +8,4 @@ BRUTAL.vcxproj.filters
 BRUTAL.vcxproj.user
 README.md
 SDL2.dll
+.gitignore
