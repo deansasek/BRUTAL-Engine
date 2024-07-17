@@ -24,6 +24,8 @@ namespace engine {
 	void mainLoop();
 	void cleanUp();
 
+	void framebufferResizeCallback(SDL_Window* window, int width, int height);
+
 	void log(std::string message, uint32_t type);
 }
 

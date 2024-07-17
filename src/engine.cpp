@@ -26,7 +26,7 @@ void engine::initWindow() {
 		logger::log("Error initializing video!", 3);
 	}
 
-	engine::window = SDL_CreateWindow(engine::name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, engine::width, engine::height, SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN);
+	engine::window = SDL_CreateWindow(engine::name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, engine::width, engine::height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN);
 
 	if (engine::window != nullptr) {
 		logger::log("Successfully created window!", 1);
@@ -54,10 +54,14 @@ void engine::mainLoop() {
 	engine::cleanUp();
 }
 
+void engine::framebufferResizeCallback(SDL_Window* window, int width, int height) {
+	engine::window = SDL_CreateWindow(engine::name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, engine::width, engine::height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN);
+}
+
 void engine::cleanUp() {
 	logger::log("Quitting...", 4);
 
-	renderer::cleanUp();
+	renderer::cleanup();
 
 	SDL_DestroyWindow(engine::window);
 

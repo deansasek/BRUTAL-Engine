@@ -1,6 +1,9 @@
 #include "./renderer.h"
 #include "../../engine.h"
 
+uint32_t renderer::currentFrame = 0;
+bool renderer::framebufferResized = false;
+
 VkInstance renderer::instance;
 VkSurfaceKHR renderer::surface;
 
@@ -27,17 +30,55 @@ VkPipelineLayout renderer::pipelineLayout;
 VkPipeline renderer::graphicsPipeline;
 
 VkCommandPool renderer::commandPool;
-VkCommandBuffer renderer::commandBuffer;
+std::vector<VkCommandBuffer> renderer::commandBuffers;
 
-VkSemaphore renderer::imageAvailableSemaphore;
-VkSemaphore renderer::renderFinishedSemaphore;
-VkFence renderer::inFlightFence;
+std::vector<VkSemaphore> renderer::imageAvailableSemaphores;
+std::vector<VkSemaphore> renderer::renderFinishedSemaphores;
+std::vector<VkFence> renderer::inFlightFences;
 
-//#ifdef NDEBUG
-	bool renderer::validationLayersEnabled = true;
-//#else
-//	bool renderer::validationLayersEnabled = false;
-//#endif
+struct vertex {
+	glm::vec2 pos;
+	glm::vec3 color;
+
+	static VkVertexInputBindingDescription getBindingDescription() {
+		VkVertexInputBindingDescription bindingDescription{};
+		bindingDescription.binding = 0;
+		bindingDescription.stride = sizeof(vertex);
+		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+		return bindingDescription;
+	}
+
+	static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
+		std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+		attributeDescriptions[0].binding = 0;
+		attributeDescriptions[0].location = 0;
+		attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[0].offset = offsetof(vertex, pos);
+
+		attributeDescriptions[1].binding = 0;
+		attributeDescriptions[1].location = 1;
+		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[1].offset = offsetof(vertex, color);
+
+		return attributeDescriptions;
+	}
+};
+
+const std::vector<vertex> vertices = {
+	{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+	{{-0.9f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+};
+
+VkBuffer renderer::vertexBuffer;
+VkDeviceMemory renderer::vertexBufferMemory;
+
+#ifdef NDEBUG
+	const bool renderer::validationLayersEnabled = false;
+#else
+	const bool renderer::validationLayersEnabled = true;
+#endif
 
 void renderer::init() {
 	logger::log("Initializing renderer...", 4);
@@ -53,7 +94,8 @@ void renderer::init() {
 	renderer::createGraphicsPipeline();
 	renderer::createFramebuffers();
 	renderer::createCommandPool();
-	renderer::createCommandBuffer();
+	renderer::createVertexBuffer();
+	renderer::createCommandBuffers();
 	renderer::createSyncObjects();
 }
 
@@ -62,32 +104,41 @@ void renderer::mainLoop() {
 }
 
 void renderer::drawFrame() {
-	vkWaitForFences(renderer::device, 1, &renderer::inFlightFence, VK_TRUE, UINT64_MAX);
-	vkResetFences(renderer::device, 1, &renderer::inFlightFence);
+	vkWaitForFences(renderer::device, 1, &renderer::inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
 	uint32_t imageIndex;
-	vkAcquireNextImageKHR(renderer::device, renderer::swapChain, UINT64_MAX, renderer::imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+	VkResult result = vkAcquireNextImageKHR(renderer::device, renderer::swapChain, UINT64_MAX, renderer::imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-	vkResetCommandBuffer(renderer::commandBuffer, 0);
-	renderer::recordCommandBuffer(renderer::commandBuffer, imageIndex);
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
+		renderer::recreateSwapChain();
+		return;
+	}
+	else if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to acquire swapchain image!");
+	}
+
+	vkResetFences(renderer::device, 1, &renderer::inFlightFences[currentFrame]);
+
+	vkResetCommandBuffer(renderer::commandBuffers[currentFrame], 0);
+	renderer::recordCommandBuffer(renderer::commandBuffers[currentFrame], imageIndex);
 
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-	VkSemaphore waitSemaphores[] = {renderer::imageAvailableSemaphore};
+	VkSemaphore waitSemaphores[] = {renderer::imageAvailableSemaphores[currentFrame]};
 	VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = waitSemaphores;
 
 	submitInfo.pWaitDstStageMask = waitStages;
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &renderer::commandBuffer;
+	submitInfo.pCommandBuffers = &renderer::commandBuffers[currentFrame];
 
-	VkSemaphore signalSemaphores[] = {renderer::renderFinishedSemaphore};
+	VkSemaphore signalSemaphores[] = {renderer::renderFinishedSemaphores[currentFrame]};
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
-	if (vkQueueSubmit(renderer::graphicsQueue, 1, &submitInfo, renderer::inFlightFence) != VK_SUCCESS) {
+	if (vkQueueSubmit(renderer::graphicsQueue, 1, &submitInfo, renderer::inFlightFences[currentFrame]) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to submit draw command buffer!");
 	}
 
@@ -104,6 +155,16 @@ void renderer::drawFrame() {
 	presentInfo.pResults = nullptr;
 
 	vkQueuePresentKHR(renderer::presentQueue, &presentInfo);
+
+	renderer::currentFrame = (renderer::currentFrame + 1) % renderer::maxFramesInFlight;
+}
+
+void renderer::recreateSwapChain() {
+	vkDeviceWaitIdle(renderer::device);
+
+	renderer::createSwapChain();
+	renderer::createImageViews();
+	renderer::createFramebuffers();
 }
 
 void renderer::createSurface() {
@@ -527,22 +588,16 @@ void renderer::createGraphicsPipeline() {
 
 	VkPipelineShaderStageCreateInfo shaderStages[] = {vertexShaderStageInfo, fragmentShaderStageInfo};
 
-	std::vector<VkDynamicState> dynamicStates = {
-		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_SCISSOR
-	};
-
-	VkPipelineDynamicStateCreateInfo dynamicState{};
-	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
-	dynamicState.pDynamicStates = dynamicStates.data();
-
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexBindingDescriptionCount = 0;
-	vertexInputInfo.pVertexBindingDescriptions = nullptr;
-	vertexInputInfo.vertexAttributeDescriptionCount = 0;
-	vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+
+	auto bindingDescription = vertex::getBindingDescription();
+	auto attributeDescriptions = vertex::getAttributeDescriptions();
+
+	vertexInputInfo.vertexBindingDescriptionCount = 1;
+	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());;
+	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
 	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -591,6 +646,16 @@ void renderer::createGraphicsPipeline() {
 	multisampling.pSampleMask = nullptr;
 	multisampling.alphaToCoverageEnable = VK_FALSE;
 	multisampling.alphaToOneEnable = VK_FALSE;
+
+	std::vector<VkDynamicState> dynamicStates = {
+	VK_DYNAMIC_STATE_VIEWPORT,
+	VK_DYNAMIC_STATE_SCISSOR
+	};
+
+	VkPipelineDynamicStateCreateInfo dynamicState{};
+	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+	dynamicState.pDynamicStates = dynamicStates.data();
 
 	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
 	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -685,7 +750,56 @@ void renderer::createFramebuffers() {
 	}
 }
 
+uint32_t renderer::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+	VkPhysicalDeviceMemoryProperties memoryProperties;
+	vkGetPhysicalDeviceMemoryProperties(renderer::physicalDevice, &memoryProperties);
+
+	for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
+		if ((typeFilter & (1 << i)) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+			logger::log("Successfully found suitable memory type!", 1);
+			return i;
+		}
+	}
+
+	throw std::runtime_error("Failed to find suitable memory type!");
+}
+
+void renderer::createVertexBuffer() {
+	VkBufferCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	createInfo.size = sizeof(vertices[0]) * vertices.size();
+	createInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	if (vkCreateBuffer(renderer::device, &createInfo, nullptr, &renderer::vertexBuffer) != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create vertex buffer!");
+	}
+
+	VkMemoryRequirements memoryRequirements;
+	vkGetBufferMemoryRequirements(renderer::device, renderer::vertexBuffer, &memoryRequirements);
+
+	VkMemoryAllocateInfo allocateInfo{};
+	allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocateInfo.allocationSize = memoryRequirements.size;
+	allocateInfo.memoryTypeIndex = renderer::findMemoryType(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	if (vkAllocateMemory(renderer::device, &allocateInfo, nullptr, &renderer::vertexBufferMemory) != VK_SUCCESS) {
+		throw std::runtime_error("Failed to allocate vertex buffer memory!");
+	}
+
+	vkBindBufferMemory(renderer::device, renderer::vertexBuffer, renderer::vertexBufferMemory, 0);
+
+	void* data;
+	vkMapMemory(renderer::device, renderer::vertexBufferMemory, 0, createInfo.size, 0, &data);
+		memcpy(data, vertices.data(), (size_t)createInfo.size);
+	vkUnmapMemory(renderer::device, renderer::vertexBufferMemory);
+}
+
 void renderer::createSyncObjects() {
+	renderer::imageAvailableSemaphores.resize(renderer::maxFramesInFlight);
+	renderer::renderFinishedSemaphores.resize(renderer::maxFramesInFlight);
+	renderer::inFlightFences.resize(renderer::maxFramesInFlight);
+
 	VkSemaphoreCreateInfo semaphoreCreateInfo{};
 	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 	
@@ -693,14 +807,16 @@ void renderer::createSyncObjects() {
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-	if (vkCreateSemaphore(renderer::device, &semaphoreCreateInfo, nullptr, &renderer::imageAvailableSemaphore) != VK_SUCCESS ||
-		vkCreateSemaphore(renderer::device, &semaphoreCreateInfo, nullptr, &renderer::renderFinishedSemaphore) != VK_SUCCESS ||
-		vkCreateFence(renderer::device, &fenceCreateInfo, nullptr, &renderer::inFlightFence) != VK_SUCCESS) {
+	for (size_t i = 0; i < renderer::maxFramesInFlight; i++) {
+		if (vkCreateSemaphore(renderer::device, &semaphoreCreateInfo, nullptr, &renderer::imageAvailableSemaphores[i]) != VK_SUCCESS ||
+			vkCreateSemaphore(renderer::device, &semaphoreCreateInfo, nullptr, &renderer::renderFinishedSemaphores[i]) != VK_SUCCESS ||
+			vkCreateFence(renderer::device, &fenceCreateInfo, nullptr, &renderer::inFlightFences[i]) != VK_SUCCESS) {
 
-		throw std::runtime_error("Failed to create semaphores and fence!");
-	}
-	else {
-		logger::log("Successfully created semaphores and fence!", 1);
+			throw std::runtime_error("Failed to create semaphores and fence!");
+		}
+		else {
+			logger::log("Successfully created semaphores and fence!", 1);
+		}
 	}
 }
 
@@ -720,14 +836,16 @@ void renderer::createCommandPool() {
 	}
 }
 
-void renderer::createCommandBuffer() {
+void renderer::createCommandBuffers() {
+	renderer::commandBuffers.resize(renderer::maxFramesInFlight);
+
 	VkCommandBufferAllocateInfo allocateInfo{};
 	allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocateInfo.commandPool = renderer::commandPool;
 	allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocateInfo.commandBufferCount = 1;
+	allocateInfo.commandBufferCount = (uint32_t)renderer::commandBuffers.size();
 
-	if (vkAllocateCommandBuffers(renderer::device, &allocateInfo, &renderer::commandBuffer) != VK_SUCCESS) {
+	if (vkAllocateCommandBuffers(renderer::device, &allocateInfo, renderer::commandBuffers.data()) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to allocate command buffers!");
 	}
 	else {
@@ -762,6 +880,10 @@ void renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer::graphicsPipeline);
 
+	VkBuffer vertexBuffers[] = {renderer::vertexBuffer};
+	VkDeviceSize offsets = {0};
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, &offsets);
+
 	VkViewport viewport{};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
@@ -776,7 +898,7 @@ void renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 	scissor.extent = renderer::swapChainExtent;
 	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-	vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+	vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
 	vkCmdEndRenderPass(commandBuffer);
 
@@ -803,14 +925,30 @@ VkShaderModule renderer::createShaderModule(const std::vector<char>& code) {
 	}
 }
 
-void renderer::cleanUp() {
+void renderer::cleanup() {
 	logger::log("Cleaning up renderer...", 4);
 
-	vkDestroySemaphore(renderer::device, renderer::imageAvailableSemaphore, nullptr);
-	vkDestroySemaphore(renderer::device, renderer::renderFinishedSemaphore, nullptr);
-	vkDestroyFence(renderer::device, renderer::inFlightFence, nullptr);
+	vkDeviceWaitIdle(renderer::device);
+
+	renderer::cleanupSwapChain();
+
+	vkDestroyBuffer(renderer::device, renderer::vertexBuffer, nullptr);
+	vkFreeMemory(renderer::device, renderer::vertexBufferMemory, nullptr);
+
+	vkDestroyPipeline(renderer::device, renderer::graphicsPipeline, nullptr);
+	vkDestroyPipelineLayout(renderer::device, renderer::pipelineLayout, nullptr);
+
+	vkDestroyRenderPass(renderer::device, renderer::renderPass, nullptr);
+
+	for (size_t i = 0; i < renderer::maxFramesInFlight; i++) {
+		vkDestroySemaphore(renderer::device, renderer::imageAvailableSemaphores[i], nullptr);
+		vkDestroySemaphore(renderer::device, renderer::renderFinishedSemaphores[i], nullptr);
+		vkDestroyFence(renderer::device, renderer::inFlightFences[i], nullptr);
+	}
 
 	vkDestroyCommandPool(renderer::device, renderer::commandPool, nullptr);
+
+	vkDestroyDevice(renderer::device, nullptr);
 
 	if (renderer::validationLayersEnabled) {
 		logger::log("Cleaning up debug messenger...", 4);
@@ -820,24 +958,28 @@ void renderer::cleanUp() {
 		logger::log("Cleaned up debug messenger!", 1);
 	}
 
-	for (auto framebuffer : renderer::swapChainFramebuffers) {
-		vkDestroyFramebuffer(renderer::device, framebuffer, nullptr);
-	}
-
-	for (auto imageView : renderer::swapChainImageViews) {
-		vkDestroyImageView(renderer::device, imageView, nullptr);
-	} 
-
-	vkDestroyPipeline(renderer::device, renderer::graphicsPipeline, nullptr);
-	vkDestroyPipelineLayout(renderer::device, renderer::pipelineLayout, nullptr);
-	vkDestroyRenderPass(renderer::device, renderer::renderPass, nullptr);
-
-	vkDestroySwapchainKHR(renderer::device, renderer::swapChain, nullptr);
-	vkDestroyDevice(renderer::device, nullptr);
 	vkDestroySurfaceKHR(renderer::instance, renderer::surface, nullptr);
 	vkDestroyInstance(renderer::instance, nullptr);
 
 	logger::log("Cleaned up renderer!", 1);
+}
+
+void renderer::cleanupSwapChain() {
+	logger::log("Cleaning up swapchain...", 4);
+
+	vkDeviceWaitIdle(renderer::device);
+
+	for (size_t i = 0; i < renderer::swapChainFramebuffers.size(); i++) {
+		vkDestroyFramebuffer(renderer::device, renderer::swapChainFramebuffers[i], nullptr);
+	}
+
+	for (size_t i = 0; i < renderer::swapChainImageViews.size(); i++) {
+		vkDestroyImageView(renderer::device, renderer::swapChainImageViews[i], nullptr);
+	}
+
+	vkDestroySwapchainKHR(renderer::device, renderer::swapChain, nullptr);
+
+	logger::log("Cleaned up swapchain!", 1);
 }
 
 // validation layers

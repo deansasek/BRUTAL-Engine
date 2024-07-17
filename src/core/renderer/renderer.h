@@ -9,6 +9,7 @@
 #include <vulkan/vulkan.h>
 
 #include <sdl2/include/SDL_vulkan.h>
+#include <glm/glm.hpp>
 
 #include "../filesystem/filesystem.h"
 
@@ -17,9 +18,14 @@
 #include <optional>
 #include <cstdint>
 #include <limits>
+#include <array>
 #include <algorithm>
 
 namespace renderer {
+	const int maxFramesInFlight = 2;
+	extern uint32_t currentFrame;
+	extern bool framebufferResized;
+
 	extern VkSurfaceKHR surface;
 	extern VkInstance instance;
 
@@ -46,6 +52,8 @@ namespace renderer {
 		std::vector<VkPresentModeKHR> presentModes = {};
 	};
 
+	extern VkBuffer vertexBuffer;
+	extern VkDeviceMemory vertexBufferMemory;
 
 	extern VkSwapchainKHR swapChain;
 	extern std::vector<VkImage> swapChainImages;
@@ -67,15 +75,15 @@ namespace renderer {
 	extern VkPipeline graphicsPipeline;
 
 	extern VkCommandPool commandPool;
-	extern VkCommandBuffer commandBuffer;
+	extern std::vector<VkCommandBuffer> commandBuffers;
 
 	const std::vector<const char*> deviceExtensions = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
 
-	extern VkSemaphore imageAvailableSemaphore;
-	extern VkSemaphore renderFinishedSemaphore;
-	extern VkFence inFlightFence;
+	extern std::vector<VkSemaphore> imageAvailableSemaphores;
+	extern std::vector<VkSemaphore> renderFinishedSemaphores;
+	extern std::vector<VkFence> inFlightFences;
 
 	void init();
 	void createInstance();
@@ -88,12 +96,18 @@ namespace renderer {
 	void createGraphicsPipeline();
 	void createFramebuffers();
 	void createCommandPool();
-	void createCommandBuffer();
+	void createVertexBuffer();
+	void createCommandBuffers();
 	void createSyncObjects();
-	void cleanUp();
 
 	void mainLoop();
 	void drawFrame();
+	void recreateSwapChain();
+
+	void cleanup();
+	void cleanupSwapChain();
+
+	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
 	bool physicalDeviceSuitable(VkPhysicalDevice physicalDevice);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice physicalDevice);
@@ -116,7 +130,7 @@ namespace renderer {
 	};
 
 	extern bool checkValidationLayerSupport();
-	extern bool validationLayersEnabled;
+	extern const bool validationLayersEnabled;
 
 	std::vector<const char*> getRequiredExtensions();
 	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
