@@ -50,11 +50,8 @@ void engine::mainLoop() {
 			engine::running = false;
 		} else if (engine::event.type == SDL_WINDOWEVENT) {
 			if (engine::event.window.event == SDL_WINDOWEVENT_MOVED) {
-				std::cout << "window moved" << std::endl;
 			}
 			else if (engine::event.window.event == SDL_WINDOWEVENT_RESIZED) {
-				std::cout << "window resized" << std::endl;
-
 				renderer::recreateSwapChain();
 			}
 		}

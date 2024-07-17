@@ -160,11 +160,25 @@ void renderer::drawFrame() {
 }
 
 void renderer::recreateSwapChain() {
+	logger::log("Recreating swapchain...", 4);
+	
+	int width = 0, height = 0;
+
+	SDL_Vulkan_GetDrawableSize(engine::window, &width, &height);
+	while (width == 0 || height == 0) {
+		SDL_Vulkan_GetDrawableSize(engine::window, &width, &height);
+		SDL_WaitEvent(&engine::event);
+	}
+
 	vkDeviceWaitIdle(renderer::device);
+
+	renderer::cleanupSwapChain();
 
 	renderer::createSwapChain();
 	renderer::createImageViews();
 	renderer::createFramebuffers();
+
+	logger::log("Successfully recreated swapchain!", 1);
 }
 
 void renderer::createSurface() {
