@@ -5,11 +5,13 @@
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #define NOMINMAX
+#define GLM_FORCE_RADIANS
 
 #include <vulkan/vulkan.h>
 
 #include <sdl2/include/SDL_vulkan.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "../filesystem/filesystem.h"
 
@@ -20,6 +22,7 @@
 #include <limits>
 #include <array>
 #include <algorithm>
+#include <chrono>
 
 namespace renderer {
 	const int maxFramesInFlight = 2;
@@ -52,8 +55,19 @@ namespace renderer {
 		std::vector<VkPresentModeKHR> presentModes = {};
 	};
 
+	struct uniformBufferObject {
+		glm::mat4 model;
+		glm::mat4 view;
+		glm::mat4 proj;
+	};
+
 	extern VkBuffer vertexBuffer;
 	extern VkDeviceMemory vertexBufferMemory;
+	extern VkBuffer indexBuffer;
+	extern VkDeviceMemory indexBufferMemory;
+	extern std::vector<VkBuffer> uniformBuffers;
+	extern std::vector<VkDeviceMemory> uniformBuffersMemory;
+	extern std::vector<void*> uniformBuffersMapped;
 
 	extern VkSwapchainKHR swapChain;
 	extern std::vector<VkImage> swapChainImages;
@@ -71,11 +85,15 @@ namespace renderer {
 	extern VkShaderModule fragmentShaderModule;
 
 	extern VkRenderPass renderPass;
+	extern VkDescriptorSetLayout descriptorSetLayout;
 	extern VkPipelineLayout pipelineLayout;
 	extern VkPipeline graphicsPipeline;
 
 	extern VkCommandPool commandPool;
 	extern std::vector<VkCommandBuffer> commandBuffers;
+
+	extern VkDescriptorPool descriptorPool;
+	extern std::vector<VkDescriptorSet> descriptorSets;
 
 	const std::vector<const char*> deviceExtensions = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -93,16 +111,25 @@ namespace renderer {
 	void createSwapChain();
 	void createImageViews();
 	void createRenderPass();
+	void createDescriptorSetLayout();
 	void createGraphicsPipeline();
 	void createFramebuffers();
 	void createCommandPool();
 	void createVertexBuffer();
+	void createIndexBuffer();
+	void createUniformBuffers();
+	void createDescriptorPool();
+	void createDescriptorSets();
 	void createCommandBuffers();
 	void createSyncObjects();
+
+	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
 	void mainLoop();
 	void drawFrame();
 	void recreateSwapChain();
+	void updateUniformBuffer(uint32_t currentImage);
 
 	void cleanup();
 	void cleanupSwapChain();
