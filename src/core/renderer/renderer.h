@@ -3,18 +3,21 @@
 #ifndef renderer_h
 #define renderer_h
 
-#define VK_USE_PLATFORM_WIN32_KHR
 #define NOMINMAX
-#define GLM_FORCE_RADIANS
 #define STB_IMAGE_IMPLEMENTATION
 
 #include <vulkan/vulkan.h>
+#define VK_USE_PLATFORM_WIN32_KHR
 
 #include <sdl2/include/SDL_vulkan.h>
+
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "../filesystem/filesystem.h"
+#include "../modules/camera.h"
 
 #include <vector>
 #include <set>
@@ -26,6 +29,41 @@
 #include <chrono>
 
 namespace renderer {
+	struct vertex {
+		glm::vec3 pos;
+		glm::vec3 color;
+		glm::vec2 texCoord;
+
+		static VkVertexInputBindingDescription getBindingDescription() {
+			VkVertexInputBindingDescription bindingDescription{};
+			bindingDescription.binding = 0;
+			bindingDescription.stride = sizeof(vertex);
+			bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+			return bindingDescription;
+		}
+
+		static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
+			std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+			attributeDescriptions[0].binding = 0;
+			attributeDescriptions[0].location = 0;
+			attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+			attributeDescriptions[0].offset = offsetof(vertex, pos);
+
+			attributeDescriptions[1].binding = 0;
+			attributeDescriptions[1].location = 1;
+			attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+			attributeDescriptions[1].offset = offsetof(vertex, color);
+
+			attributeDescriptions[2].binding = 0;
+			attributeDescriptions[2].location = 2;
+			attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+			attributeDescriptions[2].offset = offsetof(vertex, texCoord);
+
+			return attributeDescriptions;
+		}
+	};
+
 	const int maxFramesInFlight = 2;
 	extern uint32_t currentFrame;
 	extern bool framebufferResized;
@@ -40,7 +78,7 @@ namespace renderer {
 
 	extern VkQueue graphicsQueue;
 	extern VkQueue presentQueue;
-
+	
 	struct queueFamilyIndices {
 		std::optional<uint32_t> graphicsFamily;
 		std::optional<uint32_t> presentFamily;
@@ -61,6 +99,11 @@ namespace renderer {
 		glm::mat4 view;
 		glm::mat4 proj;
 	};
+
+	//gebbs
+
+	extern std::vector<vertex> vertices;
+	extern std::vector<uint32_t> indices;
 
 	extern VkBuffer vertexBuffer;
 	extern VkDeviceMemory vertexBufferMemory;
@@ -101,6 +144,10 @@ namespace renderer {
 	extern VkImageView textureImageView;
 	extern VkSampler textureSampler;
 
+	extern VkImage depthImage;
+	extern VkDeviceMemory depthImageMemory;
+	extern VkImageView depthImageView;
+
 	const std::vector<const char*> deviceExtensions = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
@@ -121,6 +168,7 @@ namespace renderer {
 	void createGraphicsPipeline();
 	void createFramebuffers();
 	void createCommandPool();
+	void createDepthResources();
 	void createTextureImage();
 	void createTextureImageView();
 	void createTextureSampler();
@@ -137,12 +185,13 @@ namespace renderer {
 	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
 	void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
-	VkImageView createImageView(VkImage image, VkFormat format);
+	VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+
+	void loadModel();
 
 	VkCommandBuffer beginSingleTimeCommands();
 	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 	void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
-
 
 	void mainLoop();
 	void drawFrame();
@@ -153,6 +202,9 @@ namespace renderer {
 	void cleanupSwapChain();
 
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+	VkFormat findDepthFormat();
+	bool hasStencilComponent(VkFormat format);
 
 	bool physicalDeviceSuitable(VkPhysicalDevice physicalDevice);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice physicalDevice);

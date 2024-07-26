@@ -1,5 +1,7 @@
 #include "./engine.h"
 #include "../src/core/renderer/renderer.h"
+#include "../src/core/modules/input.h"
+#include "../src/core/modules/camera.h"
 
 SDL_Window* engine::window;
 SDL_Event engine::event;
@@ -14,6 +16,9 @@ void engine::init() {
 	engine::running = true;
 
 	engine::initWindow();
+
+	input::initializeInput();
+
 	engine::initRenderer();
 	engine::mainLoop();
 }
@@ -48,11 +53,26 @@ void engine::mainLoop() {
 
 		if (engine::event.type == SDL_QUIT) {
 			engine::running = false;
-		} else if (engine::event.type == SDL_WINDOWEVENT) {
+		}
+		else if (engine::event.type == SDL_WINDOWEVENT) {
 			if (engine::event.window.event == SDL_WINDOWEVENT_MOVED) {
 			}
 			else if (engine::event.window.event == SDL_WINDOWEVENT_RESIZED) {
 				renderer::recreateSwapChain();
+			}
+		}
+		else if (engine::event.type == SDL_KEYDOWN) {
+			if (engine::event.key.keysym.sym == SDLK_w) {
+				camera::cameraPos.x = camera::cameraPos.x - 1.0f;
+			}
+			else if (engine::event.key.keysym.sym == SDLK_s) {
+				camera::cameraPos.x = camera::cameraPos.x + 1.0f;
+			}
+			else if (engine::event.key.keysym.sym == SDLK_a) {
+				camera::cameraPos.z = camera::cameraPos.z + 1.0f;
+			}
+			else if (engine::event.key.keysym.sym == SDLK_d) {
+				camera::cameraPos.z = camera::cameraPos.z - 1.0f;
 			}
 		}
 	}
