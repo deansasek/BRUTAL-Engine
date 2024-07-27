@@ -20,13 +20,19 @@ void camera::createCamera() {
 }
 
 glm::mat4 camera::getView() {
-
-
 	return glm::lookAt(camera::camera.eye, camera::camera.eye + camera::camera.viewDirection, camera::camera.upVector);
 }
 
 float camera::getFOV() {
 	return glm::radians(camera::camera.fov);
+}
+
+void camera::moveUp(float speed) {
+	camera::camera.eye.y -= (camera::camera.viewDirection.y * speed);
+}
+
+void camera::moveDown(float speed) {
+	camera::camera.eye.y += (camera::camera.viewDirection.y * speed);
 }
 
 void camera::moveForward(float speed) {

@@ -4,7 +4,6 @@
 #define renderer_h
 
 #define NOMINMAX
-#define STB_IMAGE_IMPLEMENTATION
 
 #include <vulkan/vulkan.h>
 #define VK_USE_PLATFORM_WIN32_KHR

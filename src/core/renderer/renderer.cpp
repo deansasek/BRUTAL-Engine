@@ -1,10 +1,8 @@
 #include "./renderer.h"
 #include "../../engine.h"
 
-#include <stb/stb_image.h>
-
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tinyobjloader/tiny_obj_loader.h>
+#include "../modules/texture.h"
+#include "../modules/model.h"
 
 uint32_t renderer::currentFrame = 0;
 bool renderer::framebufferResized = false;
@@ -54,9 +52,14 @@ std::vector<VkSemaphore> renderer::imageAvailableSemaphores;
 std::vector<VkSemaphore> renderer::renderFinishedSemaphores;
 std::vector<VkFence> renderer::inFlightFences;
 
-const std::string modelPath = "assets/house/groundPlane.obj";
+const std::string modelPath1 = "assets/house/groundPlane.obj";
+const std::string modelPath2 = "assets/house/house.obj";
 const std::string texturePath = "assets/house/groundPlane.png";
 
+const std::vector<std::string> models = {
+	"assets/house/groundPlane.obj",
+	"assets/house/house.obj"
+};
 
 std::vector<renderer::vertex> renderer::vertices;
 std::vector<uint32_t> renderer::indices;
@@ -109,36 +112,8 @@ void renderer::mainLoop() {
 }
 
 void renderer::loadModel() {
-	tinyobj::attrib_t attrib;
-	std::vector<tinyobj::shape_t> shapes;
-	std::vector<tinyobj::material_t> materials;
-	std::string err;
-
-	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, modelPath.c_str())) {
-		throw std::runtime_error("Failed to load model!");
-	}
-
-	for (const auto& shape : shapes) {
-		for (const auto& index : shape.mesh.indices) {
-			renderer::vertex vertex{};
-
-			vertex.pos = {
-				attrib.vertices[3 * index.vertex_index + 0],
-				attrib.vertices[3 * index.vertex_index + 1],
-				attrib.vertices[3 * index.vertex_index + 2]
-			};
-
-			vertex.texCoord = {
-				attrib.texcoords[2 * index.texcoord_index + 0],
-				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-			};
-
-			vertex.color = { 1.0f, 1.0f, 1.0f };
-
-
-			renderer::vertices.push_back(vertex);
-			renderer::indices.push_back(indices.size());
-		}
+	for (int i = 0; i < models.size(); i++) {
+		model::loadModel(models[i]);
 	}
 }
 
@@ -156,12 +131,11 @@ void renderer::drawFrame() {
 		throw std::runtime_error("Failed to acquire swapchain image!");
 	}
 
-	vkResetFences(renderer::device, 1, &renderer::inFlightFences[renderer::currentFrame]);
+	renderer::updateUniformBuffer(renderer::currentFrame);
 
-	vkResetCommandBuffer(renderer::commandBuffers[renderer::currentFrame], 0);
 	renderer::recordCommandBuffer(renderer::commandBuffers[renderer::currentFrame], imageIndex);
 
-	renderer::updateUniformBuffer(renderer::currentFrame);
+	vkResetFences(renderer::device, 1, &renderer::inFlightFences[renderer::currentFrame]);
 
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -207,7 +181,7 @@ void renderer::updateUniformBuffer(uint32_t currentImage) {
 	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
 	uniformBufferObject ubo{};
-	ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+	ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f);
 	ubo.view = camera::getView();
 	ubo.proj = glm::perspective(camera::getFOV(), renderer::swapChainExtent.width / (float)renderer::swapChainExtent.height, 0.1f, 100.0f);
 	ubo.proj[1][1] *= -1;
@@ -1035,9 +1009,10 @@ void renderer::createDescriptorPool() {
 
 	VkDescriptorPoolCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 	createInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
 	createInfo.pPoolSizes = poolSizes.data();
-	createInfo.maxSets = static_cast<uint32_t>(renderer::maxFramesInFlight);
+	createInfo.maxSets = static_cast<uint32_t>(renderer::maxFramesInFlight) * 2;
 
 	if (vkCreateDescriptorPool(renderer::device, &createInfo, nullptr, &renderer::descriptorPool) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create descriptor pool!");
@@ -1223,15 +1198,9 @@ VkImageView renderer::createImageView(VkImage image, VkFormat format, VkImageAsp
 }
 
 void renderer::createTextureImage() {
-	int textureWidth, textureHeight, textureChannels;
+	texture::loadTexture(texturePath);
 
-	stbi_uc* pixels = stbi_load(texturePath.c_str(), &textureWidth, &textureHeight, &textureChannels, STBI_rgb_alpha);
-
-	VkDeviceSize imageSize = textureWidth * textureHeight * 4;
-
-	if (!pixels) {
-		throw std::runtime_error("Failed to load texture image!");
-	}
+	VkDeviceSize imageSize = texture::textureWidth * texture::textureHeight * 4;
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
@@ -1240,15 +1209,15 @@ void renderer::createTextureImage() {
 	
 	void* data;
 	vkMapMemory(renderer::device, stagingBufferMemory, 0, imageSize, 0, &data);
-		memcpy(data, pixels, static_cast<size_t>(imageSize));
+		memcpy(data, texture::pixels, static_cast<size_t>(imageSize));
 	vkUnmapMemory(renderer::device, stagingBufferMemory);
 
-	stbi_image_free(pixels);
+	texture::freeTexture(texture::pixels);
 
-	renderer::createImage(textureWidth, textureHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, renderer::textureImage, renderer::textureImageMemory);
+	renderer::createImage(texture::textureWidth, texture::textureHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, renderer::textureImage, renderer::textureImageMemory);
 
 	renderer::transitionImageLayout(renderer::textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	renderer::copyBufferToImage(stagingBuffer, renderer::textureImage, static_cast<uint32_t>(textureWidth), static_cast<uint32_t>(textureHeight));
+	renderer::copyBufferToImage(stagingBuffer, renderer::textureImage, static_cast<uint32_t>(texture::textureWidth), static_cast<uint32_t>(texture::textureHeight));
 	renderer::transitionImageLayout(renderer::textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	vkDestroyBuffer(renderer::device, stagingBuffer, nullptr);
@@ -1404,7 +1373,7 @@ void renderer::createCommandBuffers() {
 void renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = 0;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	beginInfo.pInheritanceInfo = nullptr;
 
 	if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
@@ -1420,7 +1389,7 @@ void renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 	renderPassInfo.renderArea.extent = renderer::swapChainExtent;
 
 	std::array<VkClearValue, 2> clearValues{};
-	clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+	clearValues[0].color = {{1.0f, 0.0f, 0.0f, 1.0f}};
 	clearValues[1].depthStencil = {1.0f, 0};
 
 	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
@@ -1428,32 +1397,32 @@ void renderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 
 	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer::graphicsPipeline);
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer::graphicsPipeline);
 
-	VkBuffer vertexBuffers[] = {renderer::vertexBuffer};
-	VkDeviceSize offsets = {0};
+		VkBuffer vertexBuffers[] = {renderer::vertexBuffer};
+		VkDeviceSize offsets = {0};
 
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, &offsets);
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, &offsets);
 
-	vkCmdBindIndexBuffer(commandBuffer, renderer::indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindIndexBuffer(commandBuffer, renderer::indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-	VkViewport viewport{};
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width = static_cast<float>(renderer::swapChainExtent.width);
-	viewport.height = static_cast<float>(renderer::swapChainExtent.height);
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
-	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+		VkViewport viewport{};
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = static_cast<float>(renderer::swapChainExtent.width / 2);
+		viewport.height = static_cast<float>(renderer::swapChainExtent.height / 2);
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-	VkRect2D scissor{};
-	scissor.offset = {0, 0};
-	scissor.extent = renderer::swapChainExtent;
-	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+		VkRect2D scissor{};
+		scissor.offset = {0, 0};
+		scissor.extent = renderer::swapChainExtent;
+		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer::pipelineLayout, 0, 1, &renderer::descriptorSets[renderer::currentFrame], 0, nullptr);
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer::pipelineLayout, 0, 1, &renderer::descriptorSets[renderer::currentFrame], 0, nullptr);
 
-	vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+		vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
 	vkCmdEndRenderPass(commandBuffer);
 

@@ -18,6 +18,7 @@ namespace engine {
 
 	extern SDL_Window* window;
 	extern SDL_Event event;
+	extern SDL_Renderer* sdlRenderer;
 
 	void init();
 	void initWindow();

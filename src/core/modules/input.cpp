@@ -4,6 +4,14 @@
 SDL_Event inputEvent;
 bool leftMouseButtonDown, rightMouseButtonDown = false;
 
+bool leftShiftPressed = false;
+bool wPressed = false;
+bool aPressed = false;
+bool sPressed = false;
+bool dPressed = false;
+bool spacePressed = false;
+bool leftCtrlPressed = false;
+
 void input::initializeInput() {
 	logger::log("Input successfully initialized!", 1);
 }
@@ -25,21 +33,75 @@ void input::inputLoop() {
 
 	if (inputEvent.type == SDL_KEYDOWN) {
 		if (inputEvent.key.keysym.sym == SDLK_w) {
-			std::cout << "w is down" << std::endl;
-
-			camera::moveForward(0.125f);
+			wPressed = true;
 		}
 		if (inputEvent.key.keysym.sym == SDLK_s) {
-			std::cout << "s is down" << std::endl;
-
-			camera::moveBackward(0.125f);
+			sPressed = true;
 		}
 		if (inputEvent.key.keysym.sym == SDLK_a) {
-			camera::moveLeft(0.125f);
+			aPressed = true;
 		}
 		if (inputEvent.key.keysym.sym == SDLK_d) {
-			camera::moveRight(0.125f);
+			dPressed = true;
 		}
+		if (inputEvent.key.keysym.sym == SDLK_SPACE) {
+			spacePressed = true;
+		}
+		if (inputEvent.key.keysym.sym == SDLK_LCTRL) {
+			leftCtrlPressed = true;
+		}
+		if (inputEvent.key.keysym.sym == SDLK_LSHIFT) {
+			leftShiftPressed = true;
+		}
+	}
+
+	if (inputEvent.type == SDL_KEYUP) {
+		if (inputEvent.key.keysym.sym == SDLK_w) {
+			wPressed = false;
+		}
+		if (inputEvent.key.keysym.sym == SDLK_s) {
+			sPressed = false;
+		}
+		if (inputEvent.key.keysym.sym == SDLK_a) {
+			aPressed = false;
+		}
+		if (inputEvent.key.keysym.sym == SDLK_d) {
+			dPressed = false;
+		}
+		if (inputEvent.key.keysym.sym == SDLK_SPACE) {
+			spacePressed = false;
+		}
+		if (inputEvent.key.keysym.sym == SDLK_LCTRL) {
+			leftCtrlPressed = false;
+		}
+		if (inputEvent.key.keysym.sym == SDLK_LSHIFT) {
+			leftShiftPressed = false;
+		}
+	}
+
+	float cameraSpeed = 0.00125f;
+
+	if (leftShiftPressed) {
+		cameraSpeed = cameraSpeed * 2.5;
+	}
+
+	if (wPressed) {
+		camera::moveForward(cameraSpeed);
+	}
+	if (sPressed) {
+		camera::moveBackward(cameraSpeed);
+	}
+	if (aPressed) {
+		camera::moveLeft(cameraSpeed);
+	}
+	if (dPressed) {
+		camera::moveRight(cameraSpeed);
+	}
+	if (spacePressed) {
+		camera::moveUp(cameraSpeed);
+	}
+	if (leftCtrlPressed) {
+		camera::moveDown(cameraSpeed);
 	}
 
 	if (inputEvent.type == SDL_MOUSEWHEEL) {

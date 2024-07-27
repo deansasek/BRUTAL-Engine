@@ -5,6 +5,8 @@
 
 SDL_Window* engine::window;
 SDL_Event engine::event;
+SDL_Renderer* engine::sdlRenderer;
+SDL_Surface surface;
 
 const char* engine::name = "BRUTAL Engine";
 bool engine::running;
@@ -33,7 +35,8 @@ void engine::initWindow() {
 	}
 
 	engine::window = SDL_CreateWindow(engine::name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, engine::width, engine::height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN);
-
+	engine::sdlRenderer = SDL_CreateRenderer(engine::window, -1, SDL_RENDERER_ACCELERATED);
+	
 	if (engine::window != nullptr) {
 		logger::log("Successfully created window!", 1);
 	}

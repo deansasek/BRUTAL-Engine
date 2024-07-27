@@ -27,6 +27,8 @@ namespace camera {
 	glm::mat4 getView();
 	float getFOV();
 
+	void moveUp(float speed);
+	void moveDown(float speed);
 	void moveForward(float speed);
 	void moveBackward(float speed);
 	void moveLeft(float speed);
