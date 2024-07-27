@@ -25,9 +25,13 @@ void input::inputLoop() {
 
 	if (inputEvent.type == SDL_KEYDOWN) {
 		if (inputEvent.key.keysym.sym == SDLK_w) {
+			std::cout << "w is down" << std::endl;
+
 			camera::moveForward(0.125f);
 		}
 		if (inputEvent.key.keysym.sym == SDLK_s) {
+			std::cout << "s is down" << std::endl;
+
 			camera::moveBackward(0.125f);
 		}
 		if (inputEvent.key.keysym.sym == SDLK_a) {
@@ -36,6 +40,10 @@ void input::inputLoop() {
 		if (inputEvent.key.keysym.sym == SDLK_d) {
 			camera::moveRight(0.125f);
 		}
+	}
+
+	if (inputEvent.type == SDL_MOUSEWHEEL) {
+		input::mouseScroll((float)inputEvent.wheel.x, (float)inputEvent.wheel.y);
 	}
 
 	if (inputEvent.type == SDL_MOUSEBUTTONDOWN) {
@@ -72,4 +80,15 @@ void input::mouseMotion(float mouseX, float mouseY) {
 	input::mouseY += mouseY;
 
 	camera::mouseLook(input::mouseX, input::mouseY);
+}
+
+void input::mouseScroll(float scrollX, float scrollY) {
+	glm::vec2 currentScrollPosition = glm::vec2(scrollX, scrollY);
+
+	if (currentScrollPosition.y >= 0) {
+		camera::moveForward(0.25f);
+	}
+	else if (currentScrollPosition.y < 0) {
+		camera::moveBackward(0.25f);
+	}
 }

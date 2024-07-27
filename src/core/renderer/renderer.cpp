@@ -54,8 +54,8 @@ std::vector<VkSemaphore> renderer::imageAvailableSemaphores;
 std::vector<VkSemaphore> renderer::renderFinishedSemaphores;
 std::vector<VkFence> renderer::inFlightFences;
 
-const std::string modelPath = "assets/house/house.obj";
-const std::string texturePath = "assets/house/house.png";
+const std::string modelPath = "assets/house/groundPlane.obj";
+const std::string texturePath = "assets/house/groundPlane.png";
 
 
 std::vector<renderer::vertex> renderer::vertices;
@@ -209,7 +209,7 @@ void renderer::updateUniformBuffer(uint32_t currentImage) {
 	uniformBufferObject ubo{};
 	ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
 	ubo.view = camera::getView();
-	ubo.proj = glm::perspective(glm::radians(45.0f), renderer::swapChainExtent.width / (float)renderer::swapChainExtent.height, 0.1f, 100.0f);
+	ubo.proj = glm::perspective(camera::getFOV(), renderer::swapChainExtent.width / (float)renderer::swapChainExtent.height, 0.1f, 100.0f);
 	ubo.proj[1][1] *= -1;
 
 	memcpy(renderer::uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));

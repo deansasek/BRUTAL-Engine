@@ -13,6 +13,10 @@ namespace camera {
 		glm::vec3 eye;
 		glm::vec3 viewDirection;
 		glm::vec3 upVector;
+
+		float fov;
+		float xSensitivity;
+		float ySensitivity;
 	};
 
 	extern cameraStruct camera;
@@ -21,6 +25,7 @@ namespace camera {
 
 	void createCamera();
 	glm::mat4 getView();
+	float getFOV();
 
 	void moveForward(float speed);
 	void moveBackward(float speed);
