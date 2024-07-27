@@ -7,6 +7,7 @@
 #include <sdl2/include/SDL_vulkan.h>
 
 #include "./core/logger/logger.h"
+#include "./core/modules/input.h"
 
 namespace engine {
 	extern const char* name;

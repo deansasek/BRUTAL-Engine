@@ -130,7 +130,7 @@ void renderer::loadModel() {
 
 			vertex.texCoord = {
 				attrib.texcoords[2 * index.texcoord_index + 0],
-				attrib.texcoords[2 * index.texcoord_index + 1]
+				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
 			};
 
 			vertex.color = { 1.0f, 1.0f, 1.0f };
@@ -207,8 +207,8 @@ void renderer::updateUniformBuffer(uint32_t currentImage) {
 	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
 	uniformBufferObject ubo{};
-	ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	ubo.view = glm::lookAt(camera::getView(), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+	ubo.view = camera::getView();
 	ubo.proj = glm::perspective(glm::radians(45.0f), renderer::swapChainExtent.width / (float)renderer::swapChainExtent.height, 0.1f, 100.0f);
 	ubo.proj[1][1] *= -1;
 

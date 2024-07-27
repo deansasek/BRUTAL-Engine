@@ -2,12 +2,31 @@
 #ifndef camera_h
 #define camera_h
 
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
+#include "glm/gtx/rotate_vector.hpp"
+
+#include "../logger/logger.h"
 
 namespace camera {
-	extern glm::vec3 cameraPos;
+	struct cameraStruct {
+		glm::vec3 eye;
+		glm::vec3 viewDirection;
+		glm::vec3 upVector;
+	};
 
-	glm::vec3 getView();
+	extern cameraStruct camera;
+
+	extern glm::vec2 oldMousePosition;
+
+	void createCamera();
+	glm::mat4 getView();
+
+	void moveForward(float speed);
+	void moveBackward(float speed);
+	void moveLeft(float speed);
+	void moveRight(float speed);
+	void mouseLook(float mouseX, float mouseY);
 }
 
 #endif

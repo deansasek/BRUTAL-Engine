@@ -17,6 +17,7 @@ void engine::init() {
 
 	engine::initWindow();
 
+	camera::createCamera();
 	input::initializeInput();
 
 	engine::initRenderer();
@@ -47,34 +48,9 @@ void engine::initRenderer() {
 
 void engine::mainLoop() {
 	while (engine::running) {
-		SDL_PollEvent(&engine::event);
-
 		renderer::drawFrame();
 
-		if (engine::event.type == SDL_QUIT) {
-			engine::running = false;
-		}
-		else if (engine::event.type == SDL_WINDOWEVENT) {
-			if (engine::event.window.event == SDL_WINDOWEVENT_MOVED) {
-			}
-			else if (engine::event.window.event == SDL_WINDOWEVENT_RESIZED) {
-				renderer::recreateSwapChain();
-			}
-		}
-		else if (engine::event.type == SDL_KEYDOWN) {
-			if (engine::event.key.keysym.sym == SDLK_w) {
-				camera::cameraPos.x = camera::cameraPos.x - 1.0f;
-			}
-			else if (engine::event.key.keysym.sym == SDLK_s) {
-				camera::cameraPos.x = camera::cameraPos.x + 1.0f;
-			}
-			else if (engine::event.key.keysym.sym == SDLK_a) {
-				camera::cameraPos.z = camera::cameraPos.z + 1.0f;
-			}
-			else if (engine::event.key.keysym.sym == SDLK_d) {
-				camera::cameraPos.z = camera::cameraPos.z - 1.0f;
-			}
-		}
+		input::inputLoop();
 	}
 
 	engine::cleanUp();
