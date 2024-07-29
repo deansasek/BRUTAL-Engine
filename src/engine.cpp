@@ -1,7 +1,4 @@
 #include "./engine.h"
-#include "../src/core/renderer/renderer.h"
-#include "../src/core/modules/input.h"
-#include "../src/core/modules/camera.h"
 
 SDL_Window* engine::window;
 SDL_Event engine::event;

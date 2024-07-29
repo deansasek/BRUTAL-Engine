@@ -2,6 +2,8 @@
 #ifndef filesystem_h
 #define filesystem_h
 
+#include "../src/engine.h"
+
 #include <fstream>
 #include <vector>
 

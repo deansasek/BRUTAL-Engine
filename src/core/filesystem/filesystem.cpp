@@ -1,5 +1,4 @@
 #include "./filesystem.h"
-#include "../logger/logger.h"
 
 extern std::vector<char> filesystem::readFile(const std::string& fileName) {
 	std::ifstream file(fileName, std::ios::ate | std::ios::binary);

@@ -16,7 +16,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "../filesystem/filesystem.h"
-#include "../modules/camera.h"
 
 #include <vector>
 #include <set>
@@ -171,13 +170,17 @@ namespace renderer {
 	void createTextureImage();
 	void createTextureImageView();
 	void createTextureSampler();
+
 	void createVertexBuffer();
 	void createIndexBuffer();
+
 	void createUniformBuffers();
 	void createDescriptorPool();
 	void createDescriptorSets();
 	void createCommandBuffers();
 	void createSyncObjects();
+
+	void createModelBuffers();
 
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -186,7 +189,7 @@ namespace renderer {
 	void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
 	VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 
-	void loadModel();
+	void loadModels();
 
 	VkCommandBuffer beginSingleTimeCommands();
 	void endSingleTimeCommands(VkCommandBuffer commandBuffer);

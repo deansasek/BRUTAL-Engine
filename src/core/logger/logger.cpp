@@ -1,4 +1,4 @@
-#include "./logger.h";
+#include "./logger.h"
 
 void logger::log(std::string message, uint32_t type) {
 

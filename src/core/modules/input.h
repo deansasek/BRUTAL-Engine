@@ -3,8 +3,7 @@
 #ifndef input_h
 #define input_h
 
-#include "../modules/camera.h"
-#include "../renderer/renderer.h"
+#include "../src/engine.h"
 
 namespace input {
 	static float mouseX;

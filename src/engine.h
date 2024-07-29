@@ -3,11 +3,18 @@
 #ifndef engine_h
 #define engine_h
 
+#include "../src/core/renderer/renderer.h"
+
 #include <sdl2/include/SDL.h>
 #include <sdl2/include/SDL_vulkan.h>
 
 #include "./core/logger/logger.h"
-#include "./core/modules/input.h"
+
+#include "../src/core/modules/camera.h"
+#include "../src/core/modules/texture.h"
+#include "../src/core/modules/gameObject.h"
+#include "../src/core/modules/input.h"
+#include "../src/core/modules/model.h"
 
 namespace engine {
 	extern const char* name;

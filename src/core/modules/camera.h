@@ -6,7 +6,7 @@
 #include <glm/glm.hpp>
 #include "glm/gtx/rotate_vector.hpp"
 
-#include "../logger/logger.h"
+#include "../src/engine.h"
 
 namespace camera {
 	struct cameraStruct {

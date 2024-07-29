@@ -1,8 +1,4 @@
-#include "./renderer.h"
 #include "../../engine.h"
-
-#include "../modules/texture.h"
-#include "../modules/model.h"
 
 uint32_t renderer::currentFrame = 0;
 bool renderer::framebufferResized = false;
@@ -57,8 +53,7 @@ const std::string modelPath2 = "assets/house/house.obj";
 const std::string texturePath = "assets/house/groundPlane.png";
 
 const std::vector<std::string> models = {
-	"assets/house/groundPlane.obj",
-	"assets/house/house.obj"
+	"assets/house/groundPlane.obj"
 };
 
 std::vector<renderer::vertex> renderer::vertices;
@@ -97,9 +92,10 @@ void renderer::init() {
 	renderer::createTextureImage();
 	renderer::createTextureImageView();
 	renderer::createTextureSampler();
-	renderer::loadModel();
-	renderer::createVertexBuffer();
-	renderer::createIndexBuffer();
+	renderer::loadModels();
+	renderer::createModelBuffers();
+	//renderer::createVertexBuffer();
+	//renderer::createIndexBuffer();
 	renderer::createUniformBuffers();
 	renderer::createDescriptorPool();
 	renderer::createDescriptorSets();
@@ -111,9 +107,11 @@ void renderer::mainLoop() {
 	renderer::drawFrame();
 }
 
-void renderer::loadModel() {
+void renderer::loadModels() {
 	for (int i = 0; i < models.size(); i++) {
-		model::loadModel(models[i]);
+		engine::gameObject gameObject;
+
+		gameObject.createGameObject(models[i]);
 	}
 }
 
@@ -181,7 +179,7 @@ void renderer::updateUniformBuffer(uint32_t currentImage) {
 	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
 	uniformBufferObject ubo{};
-	ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f);
+	ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
 	ubo.view = camera::getView();
 	ubo.proj = glm::perspective(camera::getFOV(), renderer::swapChainExtent.width / (float)renderer::swapChainExtent.height, 0.1f, 100.0f);
 	ubo.proj[1][1] *= -1;
@@ -939,8 +937,10 @@ void renderer::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width,
 	renderer::endSingleTimeCommands(commandBuffer);
 }
 
+/*
+
 void renderer::createVertexBuffer() {
-	VkDeviceSize bufferSize = sizeof(renderer::vertices[0]) * renderer::vertices.size();
+	VkDeviceSize bufferSize = sizeof(model.data.vertices[0]) * model.data.vertices.size();
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
@@ -949,7 +949,7 @@ void renderer::createVertexBuffer() {
 
 	void* data;
 	vkMapMemory(renderer::device, stagingBufferMemory, 0, bufferSize, 0, &data);
-		memcpy(data, renderer::vertices.data(), (size_t) bufferSize);
+		memcpy(data, model.data.vertices.data(), (size_t) bufferSize);
 	vkUnmapMemory(renderer::device, stagingBufferMemory);
 
 	renderer::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, renderer::vertexBuffer, renderer::vertexBufferMemory);
@@ -963,7 +963,7 @@ void renderer::createVertexBuffer() {
 }
 
 void renderer::createIndexBuffer() {
-	VkDeviceSize bufferSize = sizeof(renderer::indices[0]) * renderer::indices.size();
+	VkDeviceSize bufferSize = sizeof(model.data.indices[0]) * model.data.indices.size();
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
@@ -972,7 +972,7 @@ void renderer::createIndexBuffer() {
 
 	void* data;
 	vkMapMemory(renderer::device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, renderer::indices.data(), (size_t)bufferSize);
+	memcpy(data, model.data.indices.data(), (size_t)bufferSize);
 	vkUnmapMemory(renderer::device, stagingBufferMemory);
 
 	renderer::createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, renderer::indexBuffer, renderer::indexBufferMemory);
@@ -984,6 +984,8 @@ void renderer::createIndexBuffer() {
 
 	logger::log("Successfully created index buffer!", 1);
 }
+
+*/
 
 void renderer::createUniformBuffers() {
 	VkDeviceSize bufferSize = sizeof(renderer::uniformBufferObject);
@@ -1198,9 +1200,10 @@ VkImageView renderer::createImageView(VkImage image, VkFormat format, VkImageAsp
 }
 
 void renderer::createTextureImage() {
-	texture::loadTexture(texturePath);
+	//engine::texture texture;
+	engine::texture texture = texture.createTexture(texturePath);
 
-	VkDeviceSize imageSize = texture::textureWidth * texture::textureHeight * 4;
+	VkDeviceSize imageSize = texture.textureStruct.textureDimensionsX * texture.textureStruct.textureDimensionsY * 4;
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
@@ -1209,15 +1212,15 @@ void renderer::createTextureImage() {
 	
 	void* data;
 	vkMapMemory(renderer::device, stagingBufferMemory, 0, imageSize, 0, &data);
-		memcpy(data, texture::pixels, static_cast<size_t>(imageSize));
+		memcpy(data, texture.textureStruct.data, static_cast<size_t>(imageSize));
 	vkUnmapMemory(renderer::device, stagingBufferMemory);
 
-	texture::freeTexture(texture::pixels);
+	texture.destroyTexture(texture.textureStruct.data);
 
-	renderer::createImage(texture::textureWidth, texture::textureHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, renderer::textureImage, renderer::textureImageMemory);
+	renderer::createImage(texture.textureStruct.textureDimensionsX, texture.textureStruct.textureDimensionsY, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, renderer::textureImage, renderer::textureImageMemory);
 
 	renderer::transitionImageLayout(renderer::textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	renderer::copyBufferToImage(stagingBuffer, renderer::textureImage, static_cast<uint32_t>(texture::textureWidth), static_cast<uint32_t>(texture::textureHeight));
+	renderer::copyBufferToImage(stagingBuffer, renderer::textureImage, static_cast<uint32_t>(texture.textureStruct.textureDimensionsX), static_cast<uint32_t>(texture.textureStruct.textureDimensionsY));
 	renderer::transitionImageLayout(renderer::textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	vkDestroyBuffer(renderer::device, stagingBuffer, nullptr);

@@ -1,4 +1,3 @@
-#include "../src/engine.h"
 #include "input.h"
 
 SDL_Event inputEvent;
@@ -82,7 +81,7 @@ void input::inputLoop() {
 	float cameraSpeed = 0.00125f;
 
 	if (leftShiftPressed) {
-		cameraSpeed = cameraSpeed * 2.5;
+		cameraSpeed = cameraSpeed * 2.5f;
 	}
 
 	if (wPressed) {
@@ -132,7 +131,7 @@ void input::inputLoop() {
 
 	if (inputEvent.type == SDL_MOUSEMOTION) {
 		if (rightMouseButtonDown) {
-			input::mouseMotion(inputEvent.motion.xrel, inputEvent.motion.yrel);
+			input::mouseMotion((float)inputEvent.motion.xrel, (float)inputEvent.motion.yrel);
 		}
 	}
 }
